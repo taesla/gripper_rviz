@@ -8,7 +8,7 @@ Modbus TCP로 명령을 하드웨어에 전달
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Float32MultiArray
 from std_srvs.srv import Trigger
 from pymodbus.client.sync import ModbusTcpClient
 import time
@@ -25,7 +25,7 @@ class GripperController(Node):
         self.declare_parameter('modbus_port', 502)
         self.declare_parameter('modbus_unit_id', 65)
         self.declare_parameter('default_force', 20.0)  # N
-        self.declare_parameter('open_width', 80.0)     # mm
+        self.declare_parameter('open_width', 110.0)    # mm (RG2 최대 110mm)
         self.declare_parameter('close_width', 0.0)     # mm
         
         # Get parameters
@@ -51,6 +51,13 @@ class GripperController(Node):
             Float32,
             '/gripper/force/command',   # 그리퍼 힘 명령
             self.force_command_callback,
+            10
+        )
+        # Combined command: [width_mm, force_n] - race condition 방지
+        self.combined_sub = self.create_subscription(
+            Float32MultiArray,
+            '/gripper/command',         # 폭+힘 동시 명령
+            self.combined_command_callback,
             10
         )
         
@@ -137,6 +144,20 @@ class GripperController(Node):
         """힘 명령 콜백 (저장만 함)"""
         self.current_force = max(3.0, min(40.0, msg.data))
         self.get_logger().info(f'Force set to: {self.current_force}N')
+    
+    def combined_command_callback(self, msg: Float32MultiArray):
+        """폭+힘 동시 명령 콜백 (race condition 방지)
+        
+        msg.data = [width_mm, force_n]
+        """
+        if len(msg.data) >= 2:
+            width_mm = msg.data[0]
+            force_n = max(3.0, min(40.0, msg.data[1]))
+            self.current_force = force_n
+            self.send_grip_command(width_mm, force_n)
+            self.get_logger().info(f'Combined command: width={width_mm}mm, force={force_n}N')
+        else:
+            self.get_logger().warn('Combined command requires [width, force]')
     
     def open_gripper_callback(self, request, response):
         """그리퍼 열기 서비스"""

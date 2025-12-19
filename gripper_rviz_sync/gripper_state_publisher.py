@@ -183,6 +183,25 @@ class GripperStatePublisher(Node):
         grip_msg = Bool()
         grip_msg.data = self.grip_detected
         self.grip_pub.publish(grip_msg)
+        
+        # 웹 API용 상태 파일 저장
+        self._save_state_to_file()
+    
+    def _save_state_to_file(self):
+        """웹 API가 빠르게 읽을 수 있도록 파일에 상태 저장"""
+        import json
+        import time
+        try:
+            state = {
+                'width': self.current_width,
+                'grip_detected': self.grip_detected,
+                'connected': self.connected,
+                'timestamp': time.time()
+            }
+            with open('/tmp/gripper_state.json', 'w') as f:
+                json.dump(state, f)
+        except Exception as e:
+            pass  # 파일 저장 실패해도 무시
     
     def destroy_node(self):
         """노드 종료 시 Modbus 연결 해제"""

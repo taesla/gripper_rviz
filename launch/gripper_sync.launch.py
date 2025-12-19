@@ -65,7 +65,7 @@ def generate_launch_description():
             'modbus_port': LaunchConfiguration('modbus_port'),
             'modbus_unit_id': 65,
             'default_force': 20.0,
-            'open_width': 80.0,
+            'open_width': 110.0,  # RG2 최대 개방폭
             'close_width': 0.0,
         }]
     )
